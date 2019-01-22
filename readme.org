@@ -1,0 +1,15 @@
+* References
+- http://home.pipeline.com/~hbaker1/sigplannotices/COMFY.TXT
+- http://home.pipeline.com/~hbaker1/sigplannotices/sigcol03.pdf
+- http://home.pipeline.com/~hbaker1/sigplannotices/sigcol04.pdf
+- http://home.pipeline.com/˜hbaker1/lisp/cfycmp.lsp
+  Link broken but see XXX
+* comfy.el
+This is my version of COMFY-65 ported to modern elisp.
+I used this to clean it up from the original:
+#+BEGIN_SRC emacs-lisp
+  (defun comfify (sym)
+    (interactive "SSymbol: ")
+    (replace-regexp (format "\\b%s\\b" sym)
+		    (format "comfy-%s" sym)))a
+#+END_SRC

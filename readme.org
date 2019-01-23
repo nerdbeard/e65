@@ -1,15 +1,28 @@
+* Intro
+I want to put together a complete 6502 environment in elisp.
+
+Features:
+- simulate multiple processors concurrently
+- simulate arbitrary hardware environments
+- assemble source code into ROMs and other images
+- emulate 6502 to run and debug code
+
+Simulation goals:
+- Two 6502s communicating via a serial interface
+- A group of 6502s communicating via packet radio
 * References
+- https://github.com/gongo/emacs-nes includes a 6502 emulator!
+** Comfy
 - http://home.pipeline.com/~hbaker1/sigplannotices/COMFY.TXT
 - http://home.pipeline.com/~hbaker1/sigplannotices/sigcol03.pdf
 - http://home.pipeline.com/~hbaker1/sigplannotices/sigcol04.pdf
-- http://home.pipeline.com/˜hbaker1/lisp/cfycmp.lsp
-  Link broken but see XXX
-* comfy.el
-This is my version of COMFY-65 ported to modern elisp.
-I used this to clean it up from the original:
+- http://home.pipeline.com/˜hbaker1/lisp/cfycmp.lsp: Link broken but see [[file:CFYCMP.LSP][local copy]] and an [[file:CFYCMP1.LSP][alternate version]] that seems to be from a slightly later period
+* [[file:comfy.el][comfy.el]]
+This is my version of COMFY-65 ported to modern elisp and without the namespace pollution.  I used this to clean it up from the original:
 #+BEGIN_SRC emacs-lisp
   (defun comfify (sym)
     (interactive "SSymbol: ")
     (replace-regexp (format "\\b%s\\b" sym)
 		    (format "comfy-%s" sym)))a
 #+END_SRC
+It still uses a bunch of globals for state and should be given a proper data structure if it is going to be used.  It's questionable how useful it actually is and may merely serve as a model for my own version.  Also, what is the license?

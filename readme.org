@@ -2,16 +2,21 @@
 I want to put together a complete 6502 environment in elisp.
 
 Features:
-- simulate multiple processors concurrently
-- simulate arbitrary hardware environments
+- simulate multiple systems concurrently
+- simulate common 65-series hardware environments and chips
 - assemble source code into ROMs and other images
-- emulate 6502 to run and debug code
+- emulate 6502, 6522, etc to run and debug code
 
 Simulation goals:
-- Two 6502s communicating via a serial interface
+- Two 6502s communicating via a serial interface (6522?)
 - A group of 6502s communicating via packet radio
+
+Interesting chips:
+- 6522 VIA 2 port parellel and 2-timer
+- 6552 RIOT (RAM I/O Timer) w/128 bytes RAM as found on 2600
 * References
 - https://github.com/gongo/emacs-nes includes a 6502 emulator!
+- https://www.atarimax.com/jindroush.atari.org/achip.html chips in the Atari
 ** Comfy
 - http://home.pipeline.com/~hbaker1/sigplannotices/COMFY.TXT
 - http://home.pipeline.com/~hbaker1/sigplannotices/sigcol03.pdf
@@ -26,3 +31,26 @@ This is my version of COMFY-65 ported to modern elisp and without the namespace 
 		    (format "comfy-%s" sym)))a
 #+END_SRC
 It still uses a bunch of globals for state and should be given a proper data structure if it is going to be used.  It's questionable how useful it actually is and may merely serve as a model for my own version.  Also, what is the license?
+* Scratch
+#+BEGIN_SRC elisp
+  ;; Create an environment
+  (e65-system
+   (e65-design ...)
+   ;; Design would have some named slots that are filled by e65-system
+   ;; like so:
+   '((high-rom . rom)
+     (prog-rom . program)
+     (config-eeprom . config)))
+
+  (e65-design
+   ;; - A CPU
+   ;; - 0 or more VIAs
+   ;;  - Okay but what about the stuff that attaches to that?  Stuff with
+   ;;    persistent state maybe?
+   ;; - 0 or more banks of SRAM
+   ;; - 0 or more ROMs
+   ;;  - Can it take a default rom or is it only specified at the e65-system 
+   ;;    level?
+   ;; - 0 or more EEPROMs?
+   )
+#+END_SRC

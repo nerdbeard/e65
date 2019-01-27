@@ -31,6 +31,19 @@ This is my version of COMFY-65 ported to modern elisp and without the namespace 
 		    (format "comfy-%s" sym)))a
 #+END_SRC
 It still uses a bunch of globals for state and should be given a proper data structure if it is going to be used.  It's questionable how useful it actually is and may merely serve as a model for my own version.  Also, what is the license?
+* emacs-nes
+Just to demonstrate that the 6502 emulator works
+#+BEGIN_SRC sh
+  hg clone git+https://github.com/gongo/emacs-nes
+#+END_SRC
+#+BEGIN_SRC elisp :results silent
+  (add-to-list 'load-path (concat default-directory "emacs-nes"))
+  (load "nes.el")
+  "Loaded emacs-nes"
+#+END_SRC
+#+BEGIN_SRC elisp :results silent
+  (nes "Tetris.nes")
+#+END_SRC
 * Scratch
 #+BEGIN_SRC elisp
   ;; Create an environment

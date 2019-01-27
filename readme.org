@@ -14,6 +14,18 @@ Simulation goals:
 Interesting chips:
 - 6522 VIA 2 port parellel and 2-timer
 - 6552 RIOT (RAM I/O Timer) w/128 bytes RAM as found on 2600
+* Components
+** Architecture
+Ideally a flexible system but initially a simple fixed system maybe with RIOT or VIA and SRAM
+** Emulator
+6502 to be provided by emacs-nes
+Bus emulation and 65xx series chip emulators to be written
+** Assembler
+To be provided by or modelled after COMFY
+** Disassembler
+To be written
+** Monitor/debugger
+To be written
 * References
 - https://github.com/gongo/emacs-nes includes a 6502 emulator!
 - https://www.atarimax.com/jindroush.atari.org/achip.html chips in the Atari

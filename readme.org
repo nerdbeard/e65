@@ -41,6 +41,7 @@ Just to demonstrate that the 6502 emulator works
   (load "nes.el")
   "Loaded emacs-nes"
 #+END_SRC
+Tetris sourced from http://www.nesfiles.com/NES/Tetris/Tetris.nes
 #+BEGIN_SRC elisp :results silent
   (nes "Tetris.nes")
 #+END_SRC

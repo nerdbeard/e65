@@ -26,6 +26,15 @@ To be provided by or modelled after COMFY
 To be written
 
 Decompile to COMFY?  maybe not possible.  In that case, the assembler can't really be COMFY either, we need another one to do round trip from the disassembler to editor to assembler to code back to disassembler.
+
+Actually, no!  COMFY compiles to a parsed assembly format, for example:
+#+BEGIN_EXAMPLE lisp
+(compile-code (3 (1+ 100)))
+  ((INC :ZERO-PAGE) (:ZERO-PAGE 100) 
+   (INC :ZERO-PAGE) (:ZERO-PAGE 100) 
+   (INC :ZERO-PAGE) (:ZERO-PAGE 100))
+#+END_EXAMPLE
+..which could totally be used as the dissassembly format.  Perfect!
 ** Monitor/debugger
 To be written
 * References

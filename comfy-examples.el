@@ -40,7 +40,7 @@
       z0 7)
 
 (setq masktable
-      '(compile '(seq 128 64 32 16 8 4 2 1) 0 0)
+      '(comfy-compile '(seq 128 64 32 16 8 4 2 1) 0 0)
       p 8)
 
 (setq testb

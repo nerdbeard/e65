@@ -24,6 +24,8 @@ Bus emulation and 65xx series chip emulators to be written
 To be provided by or modelled after COMFY
 ** Disassembler
 To be written
+
+Decompile to COMFY?  maybe not possible.  In that case, the assembler can't really be COMFY either, we need another one to do round trip from the disassembler to editor to assembler to code back to disassembler.
 ** Monitor/debugger
 To be written
 * References
@@ -43,6 +45,8 @@ This is my version of COMFY-65 ported to modern elisp and without the namespace 
 		    (format "comfy-%s" sym)))a
 #+END_SRC
 It still uses a bunch of globals for state and should be given a proper data structure if it is going to be used.  It's questionable how useful it actually is and may merely serve as a model for my own version.  Also, what is the license?
+
+Dang it, the license is [[https://www.acm.org/publications/policies/software-copyright-notice][not that great]].  I think I need to write an assembler, but I think I am allowed to use COMFY as a model.  Clearly my work so far is a derived work though and will need to be removed prior to distribution.
 * emacs-nes
 Just to demonstrate that the 6502 emulator works
 #+BEGIN_SRC sh
@@ -80,3 +84,8 @@ Tetris sourced from http://www.nesfiles.com/NES/Tetris/Tetris.nes
    ;; - 0 or more EEPROMs?
    )
 #+END_SRC
+* COMMENT Config
+# Local Variables:
+# truncate-lines: nil
+# word-wrap: t
+# End:

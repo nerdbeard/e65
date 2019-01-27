@@ -273,7 +273,7 @@
  'cmacro
  '(lambda (e)
     (let* ((p (cadr e)) (pl (cddr e)))
-      (comfy-sublis (list (cons 'pushes (genpush pl))
+      (comfy-sublis (list (cons 'pushes (comfy-genpush pl))
                     (cons 'p p)
                     (cons 'n (length pl)))
               '(seq (seq . pushes)
@@ -289,8 +289,8 @@
     (let* ((pl (cadr e))
            (body (cddr e)))
       (comfy-sublis (list (cons 'body body)
-                    (cons 'xchs (genxchs pl))
-                    (cons 'moves (genmoves pl)))
+                    (cons 'xchs (comfy-genxchs pl))
+                    (cons 'moves (comfy-genmoves pl)))
               '(seq (li s)
                     (seq . xchs)
                     (seq . body)
@@ -298,17 +298,17 @@
                     (seq . moves)
                     (return))))))
 
-(defun comfy-genxchs (pl)		; XXX NOT CALLED
+(defun comfy-genxchs (pl)
   (cond ((null pl) pl)
         (t (cons (list 'xch (list 'i (+ 258 (length pl))) (list (car pl)))
                  (comfy-genxchs (cdr pl))))))
 
-(defun comfy-genmoves (pl)		; XXX NOT CALLED
+(defun comfy-genmoves (pl)
   (cond ((null pl) nil)
         (t (cons (list 'move (list 'i (+ 258 (length pl))) (list (car pl)))
                  (comfy-genmoves (cdr pl))))))
 
-(defun comfy-genpush (pl)		; XXX NOT CALLED
+(defun comfy-genpush (pl)
   (cond ((null pl) pl)
         (t (let* ((p (car pl)))
              (append (` ((l (, p)) push)) (comfy-genpush (cdr pl)))))))
@@ -316,13 +316,13 @@
 (defun comfy-match (p e comfy-f alist)
   ;;; comfy-f is a function which is executed if the comfy-match fails.
   ;;; comfy-f had better not return.
-  (cond ((constantp p)
+  (cond ((comfy-constantp p)
          (cond ((eq p e) alist)
                (t (funcall comfy-f))))
-        ((variablep p) (cons (cons (cadr p) e) alist))
+        ((comfy-variablep p) (cons (cons (cadr p) e) alist))
         ((eq (car p) 'quote) (cond ((eq (cadr p) e) alist)
                                    (t (funcall comfy-f))))
-        ((predicate p) (cond ((funcall (cadr p) e) alist)
+        ((comfy-predicate p) (cond ((funcall (cadr p) e) alist)
                              (t (funcall comfy-f))))
         ((atom e) (funcall comfy-f))
         (t (comfy-match (car p)
@@ -333,32 +333,32 @@
                          comfy-f
                          alist)))))
 
-(defun comfy-predicate (x)		; XXX NOT CALLED
+(defun comfy-predicate (x)
   (and (consp x) (eq (car x) 'in)))
 
-(defun comfy-constantp (x) (atom x))	; XXX NOT CALLED
+(defun comfy-constantp (x) (atom x))
 
-(defun comfy-variablep (x)		; XXX NOT CALLED
+(defun comfy-variablep (x)
   (and (consp x) (eq (car x) '\,)))
 
 (defmacro comfy-cases (&rest a)
   (` (quote
       (, (catch 'comfy-cases
-           (fapplyl (cdr a)
-                    (eval (car a))
-                    '(lambda () (throw 'comfy-cases nil))))))))
+           (comfy-fapplyl (cdr a)
+			  (eval (car a))
+			  '(lambda () (throw 'comfy-cases nil))))))))
 
-(defun comfy-fapplyl (fl a fail)	; XXX NOT CALLED
+(defun comfy-fapplyl (fl a fail)
   ;;; "fail" is a function which is executed if comfy-fapplyl fails.
   ;;; "fail" had better not return.
   (cond ((null fl) (funcall fail))
         (t (catch 'comfy-fapplyl
-             (fapply (car fl) a
-                     '(lambda ()
-                        (throw 'comfy-fapplyl
-                               (comfy-fapplyl (cdr fl) a fail))))))))
+             (comfy-fapply (car fl) a
+			   '(lambda ()
+			      (throw 'comfy-fapplyl
+				     (comfy-fapplyl (cdr fl) a fail))))))))
 
-(defun comfy-fapply (comfy-f a fail)	; XXX NOT CALLED
+(defun comfy-fapply (comfy-f a fail)
   (let* ((alist (comfy-match (cadr comfy-f) a fail nil)))
     (apply (cons 'lambda
                  (cons (mapcar 'car alist)

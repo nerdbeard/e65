@@ -68,7 +68,7 @@
 
 ;;; Routines for the Universal Product Code Wand.  Requires 88 bytes+table.
 (setq upctable
-      (compile '(seq 13 25 19 61 35 49 47 59 55 11) 0 0))
+      (comfy-compile '(seq 13 25 19 61 35 49 47 59 55 11) 0 0))
 
 (setq
  code 11

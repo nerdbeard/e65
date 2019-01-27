@@ -21,20 +21,32 @@ Ideally a flexible system but initially a simple fixed system maybe with RIOT or
 6502 to be provided by emacs-nes
 Bus emulation and 65xx series chip emulators to be written
 ** Assembler
-To be provided by or modelled after COMFY
+To be provided by or modelled after COMFY or COMFY-6502
 ** Disassembler
 To be written
 
 Decompile to COMFY?  maybe not possible.  In that case, the assembler can't really be COMFY either, we need another one to do round trip from the disassembler to editor to assembler to code back to disassembler.
 
 Actually, no!  COMFY compiles to a parsed assembly format, for example:
-#+BEGIN_EXAMPLE lisp
-(compile-code (3 (1+ 100)))
+#+BEGIN_EXAMPLE
+  (compile-code (3 (1+ 100)))
+    -->
   ((INC :ZERO-PAGE) (:ZERO-PAGE 100) 
    (INC :ZERO-PAGE) (:ZERO-PAGE 100) 
    (INC :ZERO-PAGE) (:ZERO-PAGE 100))
 #+END_EXAMPLE
 ..which could totally be used as the dissassembly format.  Perfect!
+
+Hmm, no, that's COMFY-6502.  COMFY just outputs the raw code:
+#+BEGIN_SRC elisp
+  (comfy-init)
+  (seq-subseq comfy-mem (comfy-compile '(3 (1+ 100)) #x0680 nil))
+#+END_SRC
+
+#+RESULTS:
+: [230 100 230 100 230 100 76 128 6]
+
+I guess maybe I could port COMFY-6502 *back* to elisp.  It has the same crappy license as COMFY though.  Not that I aspire to have commercial applications, but there are licensing requirements I don't want to deal with just for redistribution.
 ** Monitor/debugger
 To be written
 * References
@@ -46,16 +58,27 @@ To be written
 - http://home.pipeline.com/~hbaker1/sigplannotices/sigcol04.pdf
 - http://home.pipeline.com/˜hbaker1/lisp/cfycmp.lsp: Link broken but see [[file:CFYCMP.LSP][local copy]] and an [[file:CFYCMP1.LSP][alternate version]] that seems to be from a slightly later period
 * [[file:comfy.el][comfy.el]]
-This is my version of COMFY-65 ported to modern elisp and without the namespace pollution.  I used this to clean it up from the original:
+This is my version of COMFY ported to modern elisp and without the namespace pollution.  I used this to clean it up from the original:
 #+BEGIN_SRC emacs-lisp
   (defun comfify (sym)
     (interactive "SSymbol: ")
     (replace-regexp (format "\\b%s\\b" sym)
-		    (format "comfy-%s" sym)))a
+		    (format "comfy-%s" sym)))
 #+END_SRC
 It still uses a bunch of globals for state and should be given a proper data structure if it is going to be used.  It's questionable how useful it actually is and may merely serve as a model for my own version.  Also, what is the license?
 
 Dang it, the license is [[https://www.acm.org/publications/policies/software-copyright-notice][not that great]].  I think I need to write an assembler, but I think I am allowed to use COMFY as a model.  Clearly my work so far is a derived work though and will need to be removed prior to distribution.
+
+#+BEGIN_SRC elisp
+  (comfy-init)
+  (load-file "comfy-examples.el")
+  (comfy-subseq comfy-mem (comfy-compile upcwand 'win 'lose))
+#+END_SRC
+
+#+RESULTS:
+: [162 6 224 12 176 10 181 11 73 127 149 11 232 76 4 0 162 0 224 12 176 23 181 11 160 0 192 10 176 56 217 90 0 240 4 200 76 28 0 148 12 232 76 20 0 248 169 0 162 0 224 12 176 7 117 12 232 232 76 52 0 133 13 24 101 13 101 13 162 1 224 12 176 7 117 12 232 232 76 72 0 73 15 208 1 96 nil 96 13 25 19 61 35 49 47 59 55 11]
+
+Hey, what's that `nil` doing in there?
 * emacs-nes
 Just to demonstrate that the 6502 emulator works
 #+BEGIN_SRC sh

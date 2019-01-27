@@ -7,13 +7,14 @@
                  (comfy-sublis a (cdr e))))))
 
 (defun comfy-put (symbol propname value)
-  (put (make-symbol (format "comfy-%s" symbol))
-       propname ;; (format "comfy-%s" propname)
-       value))
+  (let ((symbol (intern (concat "comfy-" (symbol-name symbol)))))
+    (put symbol
+	 propname ;; (format "comfy-%s" propname)
+	 value)))
 
 (defun comfy-get (symbol propname)
-  (get (make-symbol (format "comfy-%s" symbol))
-       propname))
+  (let ((symbol (intern (concat "comfy-" (symbol-name symbol)))))
+    (get symbol propname)))
 
 ;;; Basic test instructions.
 (comfy-put 'c=1\? 'test 176)       ;;; test carry=1.
@@ -92,12 +93,12 @@
 (setq comfy-f (length comfy-mem))
 
 (defun comfy-init ()
-  ;; XXX NOT CALLED
+  ;; XXX NOT CALLED -- but useful
   (fillarray comfy-mem 0)
   (setq comfy-f (length comfy-mem)))
 
 (defun comfy-subseq (v i)
-  ;; XXX NOT CALLED
+  ;; XXX NOT CALLED -- is this any different than seq-subseq?
   (let* ((nv (make-vector (- (length v) i) nil))
          (j 0))
     (while (< j (length nv))
@@ -172,16 +173,16 @@
 
 (defun comfy-skeleton (op)
   ;;; return the skeleton of the op code "op".
-  ;;; the "comfy-skeleton" property of op contains either
+  ;;; the "skeleton" property of op contains either
   ;;; the code for "accumulator" (groups 0,2) or "immediate" (1) addressing.
-  (logand (comfy-get op 'comfy-skeleton) 227))
+  (logand (comfy-get op 'skeleton) 227))
 
 (defun comfy-emit (i win)
   ;;; place the unconditional instruction "i" into the stream with
   ;;; success continuation "win".
   (cond ((not (= win comfy-f)) (comfy-emit i (comfy-genbr win)))
         ;;; atom is a single character instruction.
-        ((symbolp i) (comfy-gen (comfy-get i 'comfy-skeleton)))
+        ((symbolp i) (comfy-gen (comfy-get i 'skeleton)))
         ;;; no op code indicates a subroutine call.
         ((null (cdr i))
          (comfy-gen 0) (comfy-gen 0) (comfy-gen comfy-jsr) (comfy-ra comfy-f (eval (car i))))
@@ -204,7 +205,7 @@
          (comfy-ra comfy-f (eval (caddr i))))
         ;;; "\#" indicates immediate operand.
         ((eq (cadr i) '\#)
-         (comfy-ogen (- (comfy-get (car i) 'comfy-skeleton) 8)
+         (comfy-ogen (- (comfy-get (car i) 'skeleton) 8)
                (logand (eval (caddr i)) 255)))
         ;;; "i@" indicates index by i, the indirect.
         ((eq (cadr i) 'i@)

@@ -15,19 +15,92 @@ Interesting chips:
 - 6522 VIA 2 port parellel and 2-timer
 - 6552 RIOT (RAM I/O Timer) w/128 bytes RAM as found on 2600
 * Components
-** Architecture
-Ideally a flexible system but initially a simple fixed system maybe with RIOT or VIA and SRAM
+** Bus
+The bus hosts a set of devices mediated by device managers that take
+the place of address decoders, CS logic, etc.
+
+There should be a way to send named signals like IRQ, NMI and RESET.
+#+BEGIN_SRC elisp
+  (defstruct e65-bus devices)
+
+  (defstruct e65-device
+    bus
+    mapper-function ; Transforms address space and implements chip select logic
+    write-function  ; Receives write ops via transformed address
+    read-function	  ; read requests
+    tick-function	  ; clock ticks
+    )
+
+  ;;; Call each device's tick.  If exactly one device returns an `(addr
+  ;;; . data)` pair, write it to the bus.
+  (defun e65-bus-tick (bus)
+    (let (writes)
+      (dolist (device (e65-bus-devices bus))
+	(let (result (funcall (e65-device-tick-function device)))
+	  (and result (push result writes))))
+      (cond
+       ((not writes) nil)
+       ((cdr writes) (error "Bus conflict; multiple writes in same tick"))
+       (t (e65-device--write (device (caar writes) (cadr writes)))))))
+
+  ;;; Transmit a byte from a device to the other devices on the same bus
+  ;;; if their `mapper-function` is interested in `addr`.
+  (defun e65-device--write (device addr data)
+    (let ((bus (e65-device-bus device)))
+      (dolist (write-device (e65-bus-devices bus))
+	(and (not (= device write-device))
+	     (let ((addr (funcall (e65-device-mapper-function write-device)
+				  write-device addr)))
+	       (and addr (funcall (ey6-device-write-function write-device)
+				  addr data)))))))
+
+  ;;; Allow device to read from the bus by delegating to every
+  ;;; interested device attached to the bus except the reader
+  (defun e65-device-read (device addr)
+    (let ((bus (e65-device-bus device))
+	  values)
+      (dolist (read-device (e65-bus-devices bus))
+	(and (not (= device read-device))
+	     (let* ((addr (funcall (e65-device-mapper-function read-device)
+				   read-device addr))
+		    (data (and addr (funcall (e65-device-read-function
+					       read-device) addr))))
+	       (and data (push data values)))))
+      (cond
+       ((not values) #x0000) ; Or is it #xffff?
+       ((cdr values) (error "Bus conflict; multiple responses to single read"))
+       (t (car values)))))
+
+  ;; SRAM that appears twice
+  (defun e65-example-mapper (device addr)
+    ;; Ignore the 10th bit causing this chip to be mapped to
+    ;; 0x0000-0x1ffff and again to 0x2000-0x3ffff
+    (let ((addr (logand addr (lognot #x2000))))
+      ;; If modified addr is in lower 8K, use it.  otherwise return nil
+      ;; to prevent the call to read/write on the device
+      (and ((< addr #x2000) addr))))
+
+  (defun e65-example-write (device addr data)
+    (aset (e65-device-example-mem device) addr data))
+
+  (defun e65-example-read (device addr)
+    (aref (e65-device-example-mem device) addr))
+
+  (defun e65-example-tick (device)
+    (if (ee65-example-condition)
+	'(#xabcd . #xef))) ; Write to the bus, everything else will get their -write called
+#+END_SRC
 ** Emulator
 6502 to be provided by emacs-nes
 Bus emulation and 65xx series chip emulators to be written
 ** Assembler
-To be provided by or modelled after COMFY or COMFY-6502
+To be provided by or modelled after COMFY-65 or cl-comfy-6502
 ** Disassembler
 To be written
 
-Decompile to COMFY?  maybe not possible.  In that case, the assembler can't really be COMFY either, we need another one to do round trip from the disassembler to editor to assembler to code back to disassembler.
+Decompile to COMFY-65?  maybe not possible.  In that case, the assembler can't really be COMFY-65 either, we need another one to do round trip from the disassembler to editor to assembler to code back to disassembler.
 
-Actually, no!  COMFY compiles to a parsed assembly format, for example:
+cl-comfy-6502 compiles to a parsed assembly format, for example:
 #+BEGIN_EXAMPLE
   (compile-code (3 (1+ 100)))
     -->
@@ -35,9 +108,9 @@ Actually, no!  COMFY compiles to a parsed assembly format, for example:
    (INC :ZERO-PAGE) (:ZERO-PAGE 100) 
    (INC :ZERO-PAGE) (:ZERO-PAGE 100))
 #+END_EXAMPLE
-..which could totally be used as the dissassembly format.  Perfect!
+..which could totally be used as the dissassembly format.
 
-Hmm, no, that's COMFY-6502.  COMFY just outputs the raw code:
+COMFY-65 just outputs the raw code:
 #+BEGIN_SRC elisp
   (comfy-init)
   (seq-subseq comfy-mem (comfy-compile '(3 (1+ 100)) #x0680 nil))
@@ -46,7 +119,7 @@ Hmm, no, that's COMFY-6502.  COMFY just outputs the raw code:
 #+RESULTS:
 : [230 100 230 100 230 100 76 128 6]
 
-I guess maybe I could port COMFY-6502 *back* to elisp.  It has the same crappy license as COMFY though.  Not that I aspire to have commercial applications, but there are licensing requirements I don't want to deal with just for redistribution.
+I guess maybe I could port cl-comfy-6502 *back* to elisp.  It has the same crappy license as COMFY-65 though.  Not that I aspire to have commercial applications, but there are licensing requirements I don't want to deal with just for redistribution.
 ** Monitor/debugger
 To be written
 * References
@@ -58,7 +131,7 @@ To be written
 - http://home.pipeline.com/~hbaker1/sigplannotices/sigcol04.pdf
 - http://home.pipeline.com/˜hbaker1/lisp/cfycmp.lsp: Link broken but see [[file:CFYCMP.LSP][local copy]] and an [[file:CFYCMP1.LSP][alternate version]] that seems to be from a slightly later period
 * [[file:comfy.el][comfy.el]]
-This is my version of COMFY ported to modern elisp and without the namespace pollution.  I used this to clean it up from the original:
+This is my version of COMFY-65 without the namespace pollution.  I used this to clean it up from the original:
 #+BEGIN_SRC emacs-lisp
   (defun comfify (sym)
     (interactive "SSymbol: ")
@@ -67,18 +140,28 @@ This is my version of COMFY ported to modern elisp and without the namespace pol
 #+END_SRC
 It still uses a bunch of globals for state and should be given a proper data structure if it is going to be used.  It's questionable how useful it actually is and may merely serve as a model for my own version.  Also, what is the license?
 
-Dang it, the license is [[https://www.acm.org/publications/policies/software-copyright-notice][not that great]].  I think I need to write an assembler, but I think I am allowed to use COMFY as a model.  Clearly my work so far is a derived work though and will need to be removed prior to distribution.
+Dang it, the license is [[https://www.acm.org/publications/policies/software-copyright-notice][not that great]].  I think I need to write an assembler, but I think I am allowed to use COMFY-65 as a model.  Clearly my work so far is a derived work though and will need to be removed prior to distribution.
 
 #+BEGIN_SRC elisp
   (comfy-init)
   (load-file "comfy-examples.el")
-  (comfy-subseq comfy-mem (comfy-compile upcwand 'win 'lose))
+  (let* ((top comfy-f)
+	 (addr (comfy-compile upcwand
+			      'win	; XXX: This should probably
+			      'lose))	; result in some kind of error
+	 (code (subseq comfy-mem addr top)))
+    (apply 'concat
+	   (map 'list
+		(lambda (byte)
+		  (if (numberp byte)
+		      (format "%02x " byte)
+		    (format "%s " byte)))
+		code)))
 #+END_SRC
 
 #+RESULTS:
-: [162 6 224 12 176 10 181 11 73 127 149 11 232 76 4 0 162 0 224 12 176 23 181 11 160 0 192 10 176 56 217 90 0 240 4 200 76 28 0 148 12 232 76 20 0 248 169 0 162 0 224 12 176 7 117 12 232 232 76 52 0 133 13 24 101 13 101 13 162 1 224 12 176 7 117 12 232 232 76 72 0 73 15 208 1 96 nil 96 13 25 19 61 35 49 47 59 55 11]
+: a2 06 e0 0c b0 0a b5 0b 49 7f 95 0b e8 4c 04 00 a2 00 e0 0c b0 17 b5 0b a0 00 c0 0a b0 38 d9 5a 00 f0 04 c8 4c 1c 00 94 0c e8 4c 14 00 f8 a9 00 a2 00 e0 0c b0 07 75 0c e8 e8 4c 34 00 85 0d 18 65 0d 65 0d a2 01 e0 0c b0 07 75 0c e8 e8 4c 48 00 49 0f d0 01 60 00 60 
 
-Hey, what's that `nil` doing in there?
 * emacs-nes
 Just to demonstrate that the 6502 emulator works
 #+BEGIN_SRC sh

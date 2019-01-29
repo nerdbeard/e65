@@ -101,5 +101,5 @@
         (lxor \# 15)                    ; select low decimal digit.
         =0\?                            ; fails if non-zero.
         return)
-   (seq break                           ; signal failure.
+   (seq trap				; signal failure.
         return)))

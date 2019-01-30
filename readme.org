@@ -14,6 +14,7 @@ Simulation goals:
 Interesting chips:
 - 6522 VIA 2 port parellel and 2-timer
 - 6552 RIOT (RAM I/O Timer) w/128 bytes RAM as found on 2600
+- 6264 SRAM http://www.cs.uml.edu/~fredm/courses/91.305/files/cy6264.pdf
 * Components
 ** Bus
 The bus hosts a set of devices mediated by device managers that take
@@ -30,11 +31,16 @@ There is no use case for clock cycle emulation yet but I believe it might become
 
   (defstruct e65-device
     bus
-    mapper-function ; Transforms address space and implements chip select logic
-    write-function  ; Receives write ops via transformed address
-    read-function	  ; read requests
-    tick-function	  ; clock ticks
-    )
+    ;; Device-specific use
+    state
+    ;; Transforms address space and implements chip select logic
+    (map-function (lambda (device addr) nil))
+    ;; Receives write ops via transformed address
+    (write-function (lambda (device addr data) nil))
+    ;; Read requests
+    (read-function (lambda (device addr) nil))
+    ;; Clock ticks
+    (tick-function (lambda (device) nil)))
 
   ;;; Call each device's tick.
   (defun e65-bus-tick (bus)
@@ -42,12 +48,12 @@ There is no use case for clock cycle emulation yet but I believe it might become
       (funcall (e65-device-tick-function device))))
 
   ;;; Transmit a byte from a device to the other devices on the same bus
-  ;;; if their `mapper-function` is interested in `addr`.
+  ;;; if their `map-function` is interested in `addr`.
   (defun e65-device-write (device addr data)
     (let ((bus (e65-device-bus device)))
       (dolist (target (e65-bus-devices bus))
         (and (not (= device target))
-             (let ((addr (funcall (e65-device-mapper-function target)
+             (let ((addr (funcall (e65-device-map-function target)
                                   target addr)))
                (and addr (funcall (e65-device-write-function target)
                                   addr data)))))))
@@ -59,7 +65,7 @@ There is no use case for clock cycle emulation yet but I believe it might become
           values)
       (dolist (read-device (e65-bus-devices bus))
         (and (not (= device read-device))
-             (let* ((addr (funcall (e65-device-mapper-function read-device)
+             (let* ((addr (funcall (e65-device-map-function read-device)
                                    read-device addr))
                     (data (and addr (funcall (e65-device-read-function
                                               read-device) addr))))
@@ -87,6 +93,25 @@ There is no use case for clock cycle emulation yet but I believe it might become
   (defun e65-example-tick (device)
     (if (ee65-example-condition)
         '(#xabcd . #xef))) ; Write to the bus, everything else will get their -write called
+#+END_SRC
+** Devices
+*** 6264 SRAM
+#+BEGIN_SRC elisp
+  (defun e65-6264-write (device addr data)
+    (aset (e65-6264-state device)
+          (logand addr #x01ff)            ; Only 13 address pins
+          (logand data #xff)))
+
+  (defun e65-6264-read (device addr)
+    (aref (e65-6264-state device)
+          (logand addr #x01ff)))          ; Only 13 address pins
+
+  (defun make-e65-6264 (bus map-function)
+    (make-e65-device :bus bus
+                     :state (make-vector #x01ff #x00)
+                     :map-function map-function
+                     :write-function 'e65-6264-write
+                     :read-function 'e65-6264-read))
 #+END_SRC
 ** Emulator
 6502 to be provided by emacs-nes

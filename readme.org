@@ -20,6 +20,11 @@ The bus hosts a set of devices mediated by device managers that take
 the place of address decoders, CS logic, etc.
 
 There should be a way to send named signals like IRQ, NMI and RESET.
+
+Originally you could only perform writes by returning an `(addr . data)` pair from -tick, but the 6502 emulation implementation I have handy doesn't tick by clock cycle, it ticks by instruction, so it's normal to perform multiple writes in one tick.  I will end up tearing apart `emacs-nes` quite a bit and I might change how it emulates so I can do clock cycle emulation.
+
+There is no use case for clock cycle emulation yet but I believe it might become relevant as more emulated hardware is written.
+
 #+BEGIN_SRC elisp
   (defstruct e65-bus devices)
 
@@ -31,27 +36,20 @@ There should be a way to send named signals like IRQ, NMI and RESET.
     tick-function	  ; clock ticks
     )
 
-  ;;; Call each device's tick.  If exactly one device returns an `(addr
-  ;;; . data)` pair, write it to the bus.
+  ;;; Call each device's tick.
   (defun e65-bus-tick (bus)
-    (let (writes)
-      (dolist (device (e65-bus-devices bus))
-	(let (result (funcall (e65-device-tick-function device)))
-	  (and result (push result writes))))
-      (cond
-       ((not writes) nil)
-       ((cdr writes) (error "Bus conflict; multiple writes in same tick"))
-       (t (e65-device--write (device (caar writes) (cadr writes)))))))
+    (dolist (device (e65-bus-devices bus))
+      (funcall (e65-device-tick-function device))))
 
   ;;; Transmit a byte from a device to the other devices on the same bus
   ;;; if their `mapper-function` is interested in `addr`.
-  (defun e65-device--write (device addr data)
+  (defun e65-device-write (device addr data)
     (let ((bus (e65-device-bus device)))
-      (dolist (write-device (e65-bus-devices bus))
-	(and (not (= device write-device))
-	     (let ((addr (funcall (e65-device-mapper-function write-device)
-				  write-device addr)))
-	       (and addr (funcall (ey6-device-write-function write-device)
+      (dolist (target (e65-bus-devices bus))
+        (and (not (= device target))
+	     (let ((addr (funcall (e65-device-mapper-function target)
+				  target addr)))
+	       (and addr (funcall (e65-device-write-function target)
 				  addr data)))))))
 
   ;;; Allow device to read from the bus by delegating to every

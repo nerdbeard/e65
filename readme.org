@@ -47,23 +47,23 @@ There is no use case for clock cycle emulation yet but I believe it might become
     (let ((bus (e65-device-bus device)))
       (dolist (target (e65-bus-devices bus))
         (and (not (= device target))
-	     (let ((addr (funcall (e65-device-mapper-function target)
-				  target addr)))
-	       (and addr (funcall (e65-device-write-function target)
-				  addr data)))))))
+             (let ((addr (funcall (e65-device-mapper-function target)
+                                  target addr)))
+               (and addr (funcall (e65-device-write-function target)
+                                  addr data)))))))
 
   ;;; Allow device to read from the bus by delegating to every
   ;;; interested device attached to the bus except the reader
   (defun e65-device-read (device addr)
     (let ((bus (e65-device-bus device))
-	  values)
+          values)
       (dolist (read-device (e65-bus-devices bus))
-	(and (not (= device read-device))
-	     (let* ((addr (funcall (e65-device-mapper-function read-device)
-				   read-device addr))
-		    (data (and addr (funcall (e65-device-read-function
-					       read-device) addr))))
-	       (and data (push data values)))))
+        (and (not (= device read-device))
+             (let* ((addr (funcall (e65-device-mapper-function read-device)
+                                   read-device addr))
+                    (data (and addr (funcall (e65-device-read-function
+                                              read-device) addr))))
+               (and data (push data values)))))
       (cond
        ((not values) #x0000) ; Or is it #xffff?
        ((cdr values) (error "Bus conflict; multiple responses to single read"))
@@ -86,7 +86,7 @@ There is no use case for clock cycle emulation yet but I believe it might become
 
   (defun e65-example-tick (device)
     (if (ee65-example-condition)
-	'(#xabcd . #xef))) ; Write to the bus, everything else will get their -write called
+        '(#xabcd . #xef))) ; Write to the bus, everything else will get their -write called
 #+END_SRC
 ** Emulator
 6502 to be provided by emacs-nes
@@ -201,4 +201,5 @@ Tetris sourced from http://www.nesfiles.com/NES/Tetris/Tetris.nes
 # Local Variables:
 # truncate-lines: nil
 # word-wrap: t
+# indent-tabs-mode: nil
 # End:

@@ -29,6 +29,10 @@ There is no use case for clock cycle emulation yet but I believe it might become
 #+BEGIN_SRC elisp
   (defstruct e65-bus devices)
 
+  (defun e65-add-device (bus device)
+    (push device (e65-bus-devices bus))
+    (setf (e65-device-bus device) bus))
+
   (defstruct e65-device
     bus
     ;; Device-specific use
@@ -45,7 +49,7 @@ There is no use case for clock cycle emulation yet but I believe it might become
   ;;; Call each device's tick.
   (defun e65-bus-tick (bus)
     (dolist (device (e65-bus-devices bus))
-      (funcall (e65-device-tick-function device))))
+      (funcall (e65-device-tick-function device) device)))
 
   ;;; Transmit a byte from a device to the other devices on the same bus
   ;;; if their `map-function` is interested in `addr`.
@@ -94,6 +98,7 @@ There is no use case for clock cycle emulation yet but I believe it might become
     (if (ee65-example-condition)
         '(#xabcd . #xef))) ; Write to the bus, everything else will get their -write called
 #+END_SRC
+
 ** Devices
 *** 6264 SRAM
 #+BEGIN_SRC elisp
@@ -217,26 +222,19 @@ Tetris sourced from http://www.nesfiles.com/NES/Tetris/Tetris.nes
 #+END_SRC
 * Scratch
 #+BEGIN_SRC elisp
-  ;; Create an environment
-  (e65-system
-   (e65-design ...)
-   ;; Design would have some named slots that are filled by e65-system
-   ;; like so:
-   '((high-rom . rom)
-     (prog-rom . program)
-     (config-eeprom . config)))
-
-  (e65-design
-   ;; - A CPU
-   ;; - 0 or more VIAs
-   ;;  - Okay but what about the stuff that attaches to that?  Stuff with
-   ;;    persistent state maybe?
-   ;; - 0 or more banks of SRAM
-   ;; - 0 or more ROMs
-   ;;  - Can it take a default rom or is it only specified at the e65-system 
-   ;;    level?
-   ;; - 0 or more EEPROMs?
-   )
+  (let ((bus (make-e65-bus)))
+    ;; Install 8K RAM at 0x0000-0x01ff
+    (e65-add-device bus (make-e65-6264
+                         (lambda (addr)
+                           (and (> #x0200 addr) addr))))
+    ;; Install a ROM in upper 8K
+    (e65-add-device bus (make-e65-rom-from-file
+                         "random"
+                         (lambda (addr)
+                           (and (<= #xe000 addr)
+                                (logand #x01ff addr)))))
+    ;; Crank it
+    (e65-bus-tick bus))
 #+END_SRC
 * COMMENT Config
 # Local Variables:

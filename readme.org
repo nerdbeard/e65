@@ -113,6 +113,22 @@ There is no use case for clock cycle emulation yet but I believe it might become
                      :write-function 'e65-6264-write
                      :read-function 'e65-6264-read))
 #+END_SRC
+*** file-backed ROM
+#+BEGIN_SRC elisp
+  (defun e65-make-rom-from-file (bus map-function filename)
+    (let ((data (vector (with-temp-buffer
+                          (insert-file-contents-literally filename)
+                          (buffer-string)))))
+      (e65-make-rom bus map-function data)))
+
+  (defun e65-make-rom (bus map-function data)
+    (make-e65-device :bus bus
+                     :state data
+                     :map-function map-function
+                     :write-function (lambda (device addr data) nil)
+                     :read-function (lambda (device addr)
+                     (aref (e65-device-state device) addr))))
+#+END_SRC
 ** Emulator
 6502 to be provided by emacs-nes
 Bus emulation and 65xx series chip emulators to be written

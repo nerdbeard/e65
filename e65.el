@@ -75,9 +75,9 @@
   (let ((data (vector (with-temp-buffer
                         (insert-file-contents-literally filename)
                         (buffer-string)))))
-    (make-e65-rom map-function data)))
+    (make-e65-rom data map-function)))
 
-(defun make-e65-rom (map-function data)
+(defun make-e65-rom (data map-function)
   (make-e65-device :state data
                    :map-function map-function
                    :write-function (lambda (device addr data) nil)

@@ -1,3 +1,5 @@
+;;; e65-bus
+
 (defstruct e65-bus devices)
 
 (defun e65-add-device (bus device)
@@ -8,6 +10,8 @@
 (defun e65-bus-emit (bus &rest signals)
   (dolist (receiver (e65-bus-devices bus))
     (funcall (e65-device-signal-function receiver) receiver signals)))
+
+;;; e65-device
 
 (defstruct e65-device
   bus
@@ -56,6 +60,8 @@
     (and (not (eq receiver device))
          (funcall (e65-device-signal-function receiver) receiver signals))))
 
+;;; e65-6264 SRAM
+
 (defun e65-6264-write (device addr data)
   (aset (e65-6264-state device)
         (logand addr #x01ff)            ; Only 13 address pins
@@ -71,6 +77,8 @@
                    :write-function 'e65-6264-write
                    :read-function 'e65-6264-read))
 
+;;; e65-rom
+
 (defun make-e65-rom-from-file (filename map-function)
   (let ((data (vector (with-temp-buffer
                         (insert-file-contents-literally filename)
@@ -83,6 +91,8 @@
                    :write-function (lambda (device addr data) nil)
                    :read-function (lambda (device addr)
                                     (aref (e65-device-state device) addr))))
+
+;;; Scratch
 
 (defun e65-scratch ()
   (let ((bus (make-e65-bus)))

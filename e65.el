@@ -5,6 +5,10 @@
   (push device (e65-bus-devices bus))
   (setf (e65-device-bus device) bus))
 
+(defun e65-bus-emit (bus &rest signals)
+  (dolist (receiver (e65-bus-devices bus))
+    (funcall (e65-device-signal-function receiver) receiver signals)))
+
 (defstruct e65-device
   bus
   ;; Device-specific use
@@ -17,10 +21,6 @@
   (read-function (lambda (device addr) nil))
   ;; Other signal lines
   (signal-function (lambda (device signals) nil)))
-
-(defun e65-bus-emit (bus &rest signals)
-  (dolist (receiver (e65-bus-devices bus))
-    (funcall (e65-device-signal-function receiver) receiver signals)))
 
 ;; Transmit a byte from a device to the other devices on the same bus
 ;; if their `map-function` is interested in `addr`.
@@ -86,10 +86,10 @@
 
 (defun e65-scratch ()
   (let ((bus (make-e65-bus)))
-    ;; Install 8K RAM at 0x0000-0x01ff
+    ;; Install 8K RAM at 0x0000-0x1fff
     (e65-add-device bus (make-e65-6264
                          (lambda (addr)
-                           (and (> #x0200 addr) addr))))
+                           (and (> #x2000 addr) addr))))
     ;; Install a ROM in upper 8K
     (e65-add-device bus (make-e65-rom-from-file
                          "random"

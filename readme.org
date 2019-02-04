@@ -23,123 +23,9 @@ the place of address decoders, CS logic, etc.
 Devices can emit and receive read requests, write requests and signals via the bus.  Reads and writes have a 16-bit address, signals have only a truth value in the form of their presence or absence.
 
 There is no use case for clock cycle emulation yet but I believe it might become relevant as more emulated hardware is written.
-
-#+BEGIN_SRC elisp
-  (defstruct e65-bus devices)
-
-  (defun e65-add-device (bus device)
-    (push device (e65-bus-devices bus))
-    (setf (e65-device-bus device) bus))
-
-  (defstruct e65-device
-    bus
-    ;; Device-specific use
-    state
-    ;; Transforms address space and implements chip select logic
-    (map-function (lambda (device addr) nil))
-    ;; Receives write ops via transformed address
-    (write-function (lambda (device addr data) nil))
-    ;; Read requests
-    (read-function (lambda (device addr) nil))
-    ;; Other signal lines
-    (signal-function (lambda (device signals) nil))
-    )
-
-  (defun e65-bus-emit (bus &rest signals)
-    (dolist (receiver (e65-bus-devices bus))
-      (funcall (e65-device-signal-function receiver) signals)))
-
-  ;;; Transmit a byte from a device to the other devices on the same bus
-  ;;; if their `map-function` is interested in `addr`.
-  (defun e65-device-write (device addr data)
-    (let ((bus (e65-device-bus device)))
-      (dolist (target (e65-bus-devices bus))
-        (and (not (= device target))
-             (let ((addr (funcall (e65-device-map-function target)
-                                  target addr)))
-               (and addr (funcall (e65-device-write-function target)
-                                  addr data)))))))
-
-  ;;; Allow device to read from the bus by delegating to every
-  ;;; interested device attached to the bus except the reader
-  (defun e65-device-read (device addr)
-    (let ((bus (e65-device-bus device))
-          values)
-      (dolist (read-device (e65-bus-devices bus))
-        (and (not (= device read-device))
-             (let* ((addr (funcall (e65-device-map-function read-device)
-                                   read-device addr))
-                    (data (and addr (funcall (e65-device-read-function
-                                              read-device) addr))))
-               (and data (push data values)))))
-      (cond
-       ((not values) #x0000) ; Or is it #xffff?
-       ((cdr values) (error "Bus conflict; multiple responses to single read"))
-       (t (car values)))))
-
-  ;; Emit a signal to all other devices
-  (defun e65-device-emit (device signals)
-    (dolist (receiver (e65-bus-devices (e65-device-bus device)))
-      (and (not (eq receiver device))
-           (funcall (e65-device-signal-function receiver) signals))))
-
-  ;; SRAM that appears twice
-  (defun e65-example-mapper (device addr)
-    ;; Ignore the 10th bit causing this chip to be mapped to
-    ;; 0x0000-0x1ffff and again to 0x2000-0x3ffff
-    (let ((addr (logand addr (lognot #x2000))))
-      ;; If modified addr is in lower 8K, use it.  otherwise return nil
-      ;; to prevent the call to read/write on the device
-      (and ((< addr #x2000) addr))))
-
-  (defun e65-example-write (device addr data)
-    (aset (e65-device-example-mem device) addr data))
-
-  (defun e65-example-read (device addr)
-    (aref (e65-device-example-mem device) addr))
-
-  (defun e65-example-signal (device signals)
-    ;; Each cycle, write to the bus; everything else will get their
-    ;; e65-device-write-function called
-    (and (member :phi2 signals)
-         (e65-device-write device #xabcd #xef)))
-#+END_SRC
-
 ** Devices
 *** 6264 SRAM
-#+BEGIN_SRC elisp
-  (defun e65-6264-write (device addr data)
-    (aset (e65-6264-state device)
-          (logand addr #x01ff)            ; Only 13 address pins
-          (logand data #xff)))
-
-  (defun e65-6264-read (device addr)
-    (aref (e65-6264-state device)
-          (logand addr #x01ff)))          ; Only 13 address pins
-
-  (defun make-e65-6264 (bus map-function)
-    (make-e65-device :bus bus
-                     :state (make-vector #x01ff #x00)
-                     :map-function map-function
-                     :write-function 'e65-6264-write
-                     :read-function 'e65-6264-read))
-#+END_SRC
 *** file-backed ROM
-#+BEGIN_SRC elisp
-  (defun e65-make-rom-from-file (bus map-function filename)
-    (let ((data (vector (with-temp-buffer
-                          (insert-file-contents-literally filename)
-                          (buffer-string)))))
-      (e65-make-rom bus map-function data)))
-
-  (defun e65-make-rom (bus map-function data)
-    (make-e65-device :bus bus
-                     :state data
-                     :map-function map-function
-                     :write-function (lambda (device addr data) nil)
-                     :read-function (lambda (device addr)
-                     (aref (e65-device-state device) addr))))
-#+END_SRC
 ** Emulator
 6502 to be provided by emacs-nes
 Bus emulation and 65xx series chip emulators to be written
@@ -191,7 +77,6 @@ This is my version of COMFY-65 without the namespace pollution.  I used this to 
 It still uses a bunch of globals for state and should be given a proper data structure if it is going to be used.  It's questionable how useful it actually is and may merely serve as a model for my own version.  Also, what is the license?
 
 Dang it, the license is [[https://www.acm.org/publications/policies/software-copyright-notice][not that great]].  I think I need to write an assembler, but I think I am allowed to use COMFY-65 as a model.  Clearly my work so far is a derived work though and will need to be removed prior to distribution.
-
 #+BEGIN_SRC elisp
   (comfy-init)
   (load-file "comfy-examples.el")
@@ -228,19 +113,20 @@ Tetris sourced from http://www.nesfiles.com/NES/Tetris/Tetris.nes
 #+END_SRC
 * Scratch
 #+BEGIN_SRC elisp
-  (let ((bus (make-e65-bus)))
-    ;; Install 8K RAM at 0x0000-0x01ff
-    (e65-add-device bus (make-e65-6264
-                         (lambda (addr)
-                           (and (> #x0200 addr) addr))))
-    ;; Install a ROM in upper 8K
-    (e65-add-device bus (make-e65-rom-from-file
-                         "random"
-                         (lambda (addr)
-                           (and (<= #xe000 addr)
-                                (logand #x01ff addr)))))
-    ;; Crank it
-    (e65-bus-emit bus :phi0))
+  ;; SRAM that appears twice
+  (defun e65-example-mapper (device addr)
+    ;; Ignore the 10th bit causing this chip to be mapped to
+    ;; 0x0000-0x1ffff and again to 0x2000-0x3ffff
+    (let ((addr (logand addr (lognot #x2000))))
+      ;; If modified addr is in lower 8K, use it.  otherwise return nil
+      ;; to prevent the call to read/write on the device
+      (and ((< addr #x2000) addr))))
+
+  ;; Each cycle, write to the bus; everything else will get their
+  ;; e65-device-write-function called
+  (defun e65-example-signal (device signals)
+    (and (member :phi2 signals)
+         (e65-device-write device #xabcd #xef)))
 #+END_SRC
 * COMMENT Config
 # Local Variables:

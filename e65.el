@@ -191,10 +191,9 @@
 (defun e65-compile-rom ()
   (setq comfy-mem (make-vector #x10000 0))
   (comfy-init)
-  ;; I think we are building from 0xffff downward, so the first byte
-  ;; to emit is the low byte of the reset vector IIRC followed by NMI
-  ;; and IRQ in some order or another.  But, we don't have the
-  ;; addresses of our routines yet, so just emit place holder.
+  ;; We are building from 0xffff downward, which is where the 6502's
+  ;; interrupt and reset vectors are.  We don't have the addresses of
+  ;; our routines yet, so just emit place holder.
   (comfy-compile '(seq 0 0 0 0 0 0) 0 0)
   (let ((interupt-vector (comfy-compile 'resume 0 0)) ; resume on all interupts
         (reset-vector (comfy-genbr 0)))               ; loop forever
@@ -203,6 +202,7 @@
           (ih (lsh interupt-vector -8))
           (rl (logand #xff reset-vector))
           (rh (lsh reset-vector -8)))
+      ;; Replace the vector placeholders
       (aset comfy-mem #xfffa il)        ; NMI
       (aset comfy-mem #xfffb ih)
       (aset comfy-mem #xfffc rl)        ; RESET

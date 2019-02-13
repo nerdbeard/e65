@@ -109,8 +109,8 @@
 (defun comfy-gen (obj)
   ;;; place one character "obj" into the stream.
   (assert (numberp obj))
-  (assert (>= #x00 obj))
-  (assert (<= #xff obj))
+  (assert (>= obj #x00))
+  (assert (<= obj #xff))
   (setq comfy-f (1- comfy-f))
   (aset comfy-mem comfy-f obj)
   comfy-f)

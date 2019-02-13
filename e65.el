@@ -77,19 +77,17 @@
                    :write-function 'e65-6264-write
                    :read-function 'e65-6264-read))
 
-
-(defun e65-display-6264 (ram)
+(defun e65-display-bank (data)
   (switch-to-buffer "e65-6264 contents")
   (delete-region (point-min) (point-max))
-  (let ((data (e65-device-state ram)))
-    (dotimes (i #x2000)
-      (when (= 0 (mod i 16))
-        (insert (format "%04x: " i)))
-      (insert (format "%02x " (aref data i)))
-      (when (= 0 (mod (1+ i) 16))
-        (insert "\n"))
-      (when (= 0 (mod (1+ i) 256))
-        (insert "\n")))))
+  (dotimes (i (length data))
+    (when (= 0 (mod i 16))
+      (insert (format "%04x: " i)))
+    (insert (format "%02x " (aref data i)))
+    (when (= 0 (mod (1+ i) 16))
+      (insert "\n"))
+    (when (= 0 (mod (1+ i) 256))
+      (insert "\n"))))
 
 ;;; e65-rom
 
@@ -118,7 +116,9 @@
     ;; Three cycles of suppressed PUSHes
     ;; ...
     ;; Copy RESET vector to PC
-    (setf (e65-6502-state-pc state)
+    (setf (nes/cpu-register->pc
+           (nes/cpu->register
+            (e65-device-state device)))
           (logior (e65-device-read device #xfffc)
                   (lsh (e65-device-read device #xfffd) 8)))))
 
@@ -141,22 +141,73 @@
 
 (defun e65-scratch ()
   (let ((bus (make-e65-bus))
+        (cpu (make-e65-6502))
         (ram (make-e65-6264
               (lambda (device addr)
-                (and (> #x2000 addr) addr)))))
+                (and (> #x2000 addr) addr))))
+        (rom (make-e65-rom
+              (e65-compile-rom)
+              (lambda (device addr)
+                (and (<= #xe000 addr)
+                     (logand #x1fff addr))))))
     ;; Install CPU
-    (e65-add-device bus (make-e65-6502))
-    
+    (e65-add-device bus cpu)
     ;; Install 8K RAM at 0x0000-0x1fff
     (e65-add-device bus ram)
     ;; Install a ROM in upper 8K
-    (e65-add-device bus (make-e65-rom
-                         (make-vector #x2000 #x00)
-                         (lambda (device addr)
-                           (and (<= #xe000 addr)
-                                (logand #x01ff addr)))))
+    (e65-add-device bus rom)
     ;; Crank it
-    (dotimes (i 3) (e65-bus-tick bus))
-    ;; Show the output; note the result of executing three BRK
-    ;; instructions in the stack in page one!
-    (e65-display-6264 ram)))
+    (e65-bus-emit bus :reset)
+    (e65-init-trace cpu)
+    (dotimes (i 32)
+      (e65-bus-tick bus)
+      (e65-trace cpu))
+    (e65-display-bank (e65-device-state ram))))
+
+(defun e65-init-trace (cpu)
+  (switch-to-buffer "e65-trace")
+  (delete-region (point-min) (point-max))
+  (e65-trace cpu))
+
+(defun e65-trace (cpu)
+  (switch-to-buffer "e65-trace")
+  (goto-char (point-max))
+  (let ((r (nes/cpu->register (e65-device-state cpu))))
+    (insert (format "PC:%04x A:%02x X:%02x Y:%02x SP:%04x SR:%02x\n"
+                    (nes/cpu-register->pc r)
+                    (nes/cpu-register->acc r)
+                    (nes/cpu-register->idx-x r)
+                    (nes/cpu-register->idx-y r)
+                    (nes/cpu-register->sp r)
+                    (logior (lsh (if (nes/cpu-register->sr-negative r)  1 0) 7)
+                            (lsh (if (nes/cpu-register->sr-overflow r)  1 0) 6)
+                            (lsh (if (nes/cpu-register->sr-reserved r)  1 0) 5)
+                            (lsh (if (nes/cpu-register->sr-break r)     1 0) 4)
+                            (lsh (if (nes/cpu-register->sr-decimal r)   1 0) 3)
+                            (lsh (if (nes/cpu-register->sr-interrupt r) 1 0) 2)
+                            (lsh (if (nes/cpu-register->sr-zero r)      1 0) 1)
+                            (lsh (if (nes/cpu-register->sr-carry r)     1 0) 0))))))
+
+(defun e65-compile-rom ()
+  (setq comfy-mem (make-vector #x10000 0))
+  (comfy-init)
+  ;; I think we are building from 0xffff downward, so the first byte
+  ;; to emit is the low byte of the reset vector IIRC followed by NMI
+  ;; and IRQ in some order or another.  But, we don't have the
+  ;; addresses of our routines yet, so just emit place holder.
+  (comfy-compile '(seq 0 0 0 0 0 0) 0 0)
+  (let ((interupt-vector (comfy-compile 'resume 0 0)) ; resume on all interupts
+        (reset-vector (comfy-genbr 0)))               ; loop forever
+    (comfy-ra reset-vector reset-vector)
+    (let ((il (logand #xff interupt-vector))
+          (ih (lsh interupt-vector -8))
+          (rl (logand #xff reset-vector))
+          (rh (lsh reset-vector -8)))
+      (aset comfy-mem #xfffa il)        ; NMI
+      (aset comfy-mem #xfffb ih)
+      (aset comfy-mem #xfffc rl)        ; RESET
+      (aset comfy-mem #xfffd rh)
+      (aset comfy-mem #xfffe il)        ; IRQ
+      (aset comfy-mem #xffff ih)))
+  ;; Return last 8Kb as rom image
+  (subseq comfy-mem #xe000))

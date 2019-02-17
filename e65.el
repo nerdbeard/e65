@@ -1,3 +1,9 @@
+;;; e65
+
+(require 'comfy)
+(require 'nes-cpu)
+(provide 'e65)
+
 ;;; e65-bus
 
 (defstruct e65-bus devices)
@@ -146,7 +152,7 @@
               (lambda (device addr)
                 (and (> #x2000 addr) addr))))
         (rom (make-e65-rom
-              (e65-compile-rom)
+              (e65-compile-rom '(loop (seq push (1+ a))))
               (lambda (device addr)
                 (and (<= #xe000 addr)
                      (logand #x1fff addr))))))
@@ -188,26 +194,26 @@
                             (lsh (if (nes/cpu-register->sr-zero r)      1 0) 1)
                             (lsh (if (nes/cpu-register->sr-carry r)     1 0) 0))))))
 
-(defun e65-compile-rom ()
-  (setq comfy-mem (make-vector #x10000 0))
-  (comfy-init)
-  ;; We are building from 0xffff downward, which is where the 6502's
-  ;; interrupt and reset vectors are.  We don't have the addresses of
-  ;; our routines yet, so just emit place holder.
-  (comfy-compile '(seq 0 0 0 0 0 0) 0 0)
-  (let ((interupt-vector (comfy-compile 'resume 0 0)) ; resume on all interupts
-        (reset-vector (comfy-genbr 0)))               ; loop forever
-    (comfy-ra reset-vector reset-vector)
-    (let ((il (logand #xff interupt-vector))
-          (ih (lsh interupt-vector -8))
-          (rl (logand #xff reset-vector))
-          (rh (lsh reset-vector -8)))
-      ;; Replace the vector placeholders
-      (aset comfy-mem #xfffa il)        ; NMI
-      (aset comfy-mem #xfffb ih)
-      (aset comfy-mem #xfffc rl)        ; RESET
-      (aset comfy-mem #xfffd rh)
-      (aset comfy-mem #xfffe il)        ; IRQ
-      (aset comfy-mem #xffff ih)))
-  ;; Return last 8Kb as rom image
-  (subseq comfy-mem #xe000))
+(defun e65-compile-rom (code)
+  (let* ((comfy (make-comfy))
+         (comfy-mem (comfy-mem comfy)))
+    ;; We are building from 0xffff downward, which is where the 6502's
+    ;; interrupt and reset vectors are.  We don't have the addresses of
+    ;; our routines yet, so just emit place holder.
+    (comfy-compile comfy '(seq 0 0 0 0 0 0) 0 0)
+    (let* ((main (comfy-compile comfy code 0 0))
+           (interupt-vector (comfy-compile comfy 'resume 0 0)) ; resume on all interupts
+           (reset-vector (comfy-genbr comfy main)))
+      (let ((il (logand #xff interupt-vector))
+            (ih (lsh interupt-vector -8))
+            (rl (logand #xff reset-vector))
+            (rh (lsh reset-vector -8)))
+        ;; Replace the vector placeholders
+        (aset comfy-mem #xfffa il)        ; NMI
+        (aset comfy-mem #xfffb ih)
+        (aset comfy-mem #xfffc rl)        ; RESET
+        (aset comfy-mem #xfffd rh)
+        (aset comfy-mem #xfffe il)        ; IRQ
+        (aset comfy-mem #xffff ih)))
+    ;; Return last 8Kb as rom image
+    (subseq comfy-mem #xe000)))

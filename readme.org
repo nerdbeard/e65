@@ -47,7 +47,7 @@ cl-comfy-6502 compiles to a parsed assembly format, for example:
 ..which could totally be used as the dissassembly format.
 
 COMFY-65 just outputs the raw code:
-#+BEGIN_SRC elisp
+#+BEGIN_SRC elisp :exports both
   (comfy-init)
   (seq-subseq comfy-mem (comfy-compile '(3 (1+ 100)) #x0680 nil))
 #+END_SRC
